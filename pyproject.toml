@@ -1,10 +1,39 @@
 [project]
 name = "lzw-compression"
 version = "0.1.0"
-dependencies = [
-    "Pillow",
-    "numpy",
+description = "A Python implementation of LZW compression algorithm."
+readme = "README.md"
+requires-python = ">=3.12"
+license = "MIT"
+license-files = ["LICENSE"]
+keywords = ["lzw", "lzw-compression", "compression"]
+
+authors = [
+    { name = "Ertan Tunç Türk", email = "ertantuncturk61@gmail.com" }
 ]
+
+maintainers = [
+    { name = "Ertan Tunç Türk", email = "ertantuncturk61@gmail.com" }
+]
+
+dependencies = [
+  "Pillow",
+  "numpy",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pyforge_test",
+  "ruff",
+]
+
+[project.scripts]
+lzw-gui = "lzw_compression.ui.app:main"
+
+
+# ----------------------
+# Ruff Configuration
+# ----------------------
 
 [tool.ruff]
 line-length = 100
@@ -12,4 +41,24 @@ target-version = "py312"
 fix = true
 
 [tool.ruff.lint]
-select = ["E", "F", "I", "B", "C4", "UP"]
+select = [
+    "E",    # pycodestyle errors
+    "W",    # pycodestyle warnings
+    "F",    # pyflakes
+    "I",    # import sorting
+    "UP",   # pyupgrade
+    "B",    # bugbear
+    "C4",   # comprehensions
+    "SIM",  # simplifications
+    "RUF",  # Ruff-specific rules
+    "PL",   # pylint subset
+    "ARG"   # unused arguments
+]
+
+ignore = []
+fixable = ["ALL"]
+unfixable = []
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"

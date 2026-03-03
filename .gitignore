@@ -1,43 +1,74 @@
-# ======================
-# Python
-# ======================
+# ==================================================
+# OS
+# ==================================================
+
+*~
+.fuse_hidden*
+.directory
+.Trash-*
+.nfs*
+
+# ==================================================
+# Python Bytecode & Caches
+# ==================================================
 
 __pycache__/
 *.py[cod]
-*.pyo
-*.pyd
-*.so
+*$py.class
 
-# Virtual environments
+# Tooling caches
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+.pyre/
+.pytype/
+.hypothesis/
+
+# ==================================================
+# Virtual Environment
+# ==================================================
+
 .venv/
-venv/
-env/
 
-# Distribution / packaging
+# ==================================================
+# Build & Packaging
+# ==================================================
+
 build/
 dist/
 *.egg-info/
+.eggs/
+*.egg
 
-# Test / coverage
+# ==================================================
+# Coverage & Test Reports
+# ==================================================
+
 .coverage
+.coverage.*
+coverage.xml
 htmlcov/
-.pytest_cache/
 
-# Type checking
-.mypy_cache/
+# ==================================================
+# Logs
+# ==================================================
 
-# Ruff
-.ruff_cache/
+*.log
 
-# ======================
-# VS Code
-# ======================
+# ==================================================
+# VS Code Insiders 
+# ==================================================
 
-.vscode/
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+!.vscode/launch.json
+!.vscode/tasks.json
 
-# ======================
-# OS
-# ======================
+.history/
 
-.DS_Store
-Thumbs.db
+# ==================================================
+# Project-specific
+# ==================================================
+
+.tmp/
