@@ -78,10 +78,10 @@ def convert_bytes_to_codes(
                 codes.append(code)  # Add the code to the list
                 buffer_count -= current_width  # Decrease the bit count by the current width
 
-            # Update the dictionary size and adjust bit width if necessary
-            dictionary_size += 1
-            if dictionary_size >= 2**current_width and current_width < max_width:
-                current_width += 1
+                # Update the dictionary size and adjust bit width if necessary
+                dictionary_size += 1
+                if dictionary_size >= 2**current_width and current_width < max_width:
+                    current_width += 1
         return codes  # Return the list of decoded codes
     except Exception as e:
         print(f"An error occurred during converting bytes to codes: {e}")

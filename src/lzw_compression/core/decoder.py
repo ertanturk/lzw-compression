@@ -5,6 +5,9 @@ import numpy as np
 from lzw_compression.core.bitstream import convert_bytes_to_codes
 from lzw_compression.core.io import open_bitstream_file, open_bitstream_file_with_dimensions
 
+# Maximum code value for 12-bit encoding (2^12 = 4096, indices 0-4095)
+MAX_CODE = 4096
+
 
 def text_file_decoder(file_path: str) -> list[int]:
     """Decodes a bitstream file containing LZW encoded data back into a list of integer codes.
@@ -61,8 +64,9 @@ def codes_to_text(codes: list[int]) -> str:
             result += entry
 
             # Add new entry to dictionary with previous phrase + first char of current
-            dictionary[next_free_code] = previous_entry + entry[0]
-            next_free_code += 1
+            if next_free_code < MAX_CODE:  # Only add if within 12-bit limit
+                dictionary[next_free_code] = previous_entry + entry[0]
+                next_free_code += 1
 
             previous_entry = entry
 
@@ -108,8 +112,9 @@ def codes_to_image_grayscale(codes: list[int], image_shape: tuple[int, int]) -> 
             result += entry
 
             # Add new entry to dictionary with previous phrase + first char of current
-            dictionary[next_free_code] = previous_entry + entry[0]
-            next_free_code += 1
+            if next_free_code < MAX_CODE:  # Only add if within 12-bit limit
+                dictionary[next_free_code] = previous_entry + entry[0]
+                next_free_code += 1
 
             previous_entry = entry
 

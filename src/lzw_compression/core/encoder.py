@@ -4,6 +4,9 @@ import numpy as np
 
 from lzw_compression.core.io import open_image_file, open_text_file
 
+# Maximum code value for 12-bit encoding (2^12 = 4096, indices 0-4095)
+MAX_CODE = 4096
+
 
 def text_file_encoder(file_path: str) -> list[int]:
     """Encodes a text file using the LZW compression algorithm.
@@ -34,10 +37,11 @@ def text_file_encoder(file_path: str) -> list[int]:
                 current_string = combined_string  # Update current string to the combined string
             else:
                 result.append(dictionary[current_string])  # Output the code for the current string
-                dictionary[combined_string] = (
-                    next_free_code  # Add combined string to the dictionary
-                )
-                next_free_code += 1  # Increment the next free code
+                if next_free_code < MAX_CODE:  # Only add if within 12-bit limit
+                    dictionary[combined_string] = (
+                        next_free_code  # Add combined string to the dictionary
+                    )
+                    next_free_code += 1  # Increment the next free code
                 current_string = symbol  # Start a new current string with the symbol
         if current_string:  # Output the code for the last current string if it's not empty
             result.append(dictionary[current_string])
@@ -81,10 +85,11 @@ def image_file_encoder_grayscale(file_path: str) -> list[int]:
                 current_string = combined_string  # Update current string to the combined string
             else:
                 result.append(dictionary[current_string])  # Output the code for the current string
-                dictionary[combined_string] = (
-                    next_free_code  # Add combined string to the dictionary
-                )
-                next_free_code += 1  # Increment the next free code
+                if next_free_code < MAX_CODE:  # Only add if within 12-bit limit
+                    dictionary[combined_string] = (
+                        next_free_code  # Add combined string to the dictionary
+                    )
+                    next_free_code += 1  # Increment the next free code
                 current_string = symbol  # Start a new current string with the symbol
         if current_string:  # Output the code for the last current string if it's not empty
             result.append(dictionary[current_string])
@@ -172,10 +177,11 @@ def image_file_encoder_grayscale_differences(file_path: str) -> list[int]:
                 current_string = combined_string  # Update current string to the combined string
             else:
                 result.append(dictionary[current_string])  # Output the code for the current string
-                dictionary[combined_string] = (
-                    next_free_code  # Add combined string to the dictionary
-                )
-                next_free_code += 1  # Increment the next free code
+                if next_free_code < MAX_CODE:  # Only add if within 12-bit limit
+                    dictionary[combined_string] = (
+                        next_free_code  # Add combined string to the dictionary
+                    )
+                    next_free_code += 1  # Increment the next free code
                 current_string = symbol  # Start a new current string with the symbol
         if current_string:  # Output the code for the last current string if it's not empty
             result.append(dictionary[current_string])
