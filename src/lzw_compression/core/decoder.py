@@ -1,6 +1,7 @@
 import sys
 
 import numpy as np
+from numpy.typing import NDArray
 
 from lzw_compression.core.bitstream import convert_bytes_to_codes
 from lzw_compression.core.io import open_bitstream_file, open_bitstream_file_with_dimensions
@@ -168,10 +169,10 @@ def codes_to_image_grayscale_differences(
         delta_pixels_offset = codes_to_image_grayscale(codes, image_shape)
 
         # Remove the +128 offset to get raw differences
-        delta_pixels = delta_pixels_offset.astype(int) - 128
+        delta_pixels: NDArray[np.int16] = delta_pixels_offset.astype(np.int16) - 128
 
         # Initialize reconstructed image
-        image = np.zeros(image_shape, dtype=np.uint8)
+        image: NDArray[np.uint8] = np.zeros(image_shape, dtype=np.uint8)
 
         # [0,0]: First pixel (original, not a difference)
         image[0, 0] = delta_pixels[0, 0]

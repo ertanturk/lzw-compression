@@ -20,7 +20,7 @@ from lzw_compression.core.metrics import (
     calculate_text_compression_metrics,
 )
 
-_SRC = "samples/short_text.csv"
+_SRC = "samples/long_text.txt"
 
 
 def _compress_text(suffix: str = "") -> tuple[str, list[int], bytes]:
@@ -37,7 +37,7 @@ def _compress_text(suffix: str = "") -> tuple[str, list[int], bytes]:
 
 @test
 def test_compression_ratio():
-    """CR is between 0 and 1 for short text."""
+    """CR is between 0 and 1 for compressible text."""
     lzw, *_ = _compress_text("_cr")
     assert 0 <= calculate_compression_ratio(_SRC, lzw) <= 1
 
@@ -51,7 +51,7 @@ def test_compression_factor():
 
 @test
 def test_space_saving():
-    """SS is between 0 and 1."""
+    """SS is between 0 and 1 for compressible text."""
     lzw, *_ = _compress_text("_ss")
     assert 0 <= calculate_space_saving(_SRC, lzw) <= 1
 

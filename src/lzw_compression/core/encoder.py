@@ -155,7 +155,7 @@ def image_file_encoder_grayscale_differences(file_path: str) -> list[int]:
 
         # Offset differences to 0-255 range (to handle negative values)
         # Differences range from -255 to +255, we shift by 128 to get 0-255
-        diff_array_offset = ((diff_array.astype(int) + 128) % 256).astype(int)
+        diff_array_offset: np.ndarray = ((diff_array.astype(int) + 128) % 256).astype(int)
 
         # Flatten the difference array to a 1D list of pixel values
         pixel_values = diff_array_offset.flatten()

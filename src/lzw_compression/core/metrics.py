@@ -100,6 +100,27 @@ def calculate_space_saving(original_file_path: str, compressed_file_path: str) -
         sys.exit(1)
 
 
+def calculate_size_difference(original_file_path: str, compressed_file_path: str) -> int:
+    """Calculate byte difference between original and compressed files.
+
+    Difference = size_of_original_file - size_of_compressed_file
+
+    Args:
+        original_file_path (str): Path to the original file.
+        compressed_file_path (str): Path to the compressed file.
+
+    Returns:
+        int: Difference in bytes (positive means saved space).
+    """
+    try:
+        original_size = calculate_file_size(original_file_path)
+        compressed_size = calculate_file_size(compressed_file_path)
+        return original_size - compressed_size
+    except Exception as e:
+        print(f"An error occurred while calculating size difference: {e}")
+        sys.exit(1)
+
+
 def calculate_entropy(pixel_values: np.ndarray) -> float:
     """Calculate the entropy of pixel values (for images).
 
@@ -119,15 +140,47 @@ def calculate_entropy(pixel_values: np.ndarray) -> float:
         _, counts = np.unique(pixel_values, return_counts=True)
         probabilities = counts / len(pixel_values)
 
-        # Calculate entropy
-        entropy = -np.sum(probabilities * np.log2(probabilities + 1e-10))
+        # Calculate entropy: H = -Σ p(x) log2 p(x)
+        entropy = float(np.sum(probabilities * np.log2(probabilities)) * -1.0)
         return entropy
     except Exception as e:
         print(f"An error occurred while calculating entropy: {e}")
         sys.exit(1)
 
 
-def calculate_average_code_length(bitstream: bytes, codes: list[int]) -> float:
+def calculate_total_code_bits(codes: list[int], initial_width: int = 9, max_width: int = 12) -> int:
+    """Calculate total payload bits used by variable-width LZW codes.
+
+    Args:
+        codes (list[int]): Encoded LZW codes.
+        initial_width (int, optional): Initial code width. Defaults to 9.
+        max_width (int, optional): Maximum code width. Defaults to 12.
+
+    Returns:
+        int: Number of data bits used by the encoded code stream.
+    """
+    try:
+        total_bits = 0
+        current_width = initial_width
+        dictionary_size = 256
+
+        for _ in codes:
+            total_bits += current_width
+            dictionary_size += 1
+            if dictionary_size >= 2**current_width and current_width < max_width:
+                current_width += 1
+
+        return total_bits
+    except Exception as e:
+        print(f"An error occurred while calculating total code bits: {e}")
+        sys.exit(1)
+
+
+def calculate_average_code_length(
+    bitstream: bytes,
+    codes: list[int],
+    symbol_count: int | None = None,
+) -> float:
     """Calculate the average code length in bits.
 
     Average code length = (size_of_bitstream_in_bits) / (number_of_codes)
@@ -143,8 +196,12 @@ def calculate_average_code_length(bitstream: bytes, codes: list[int]) -> float:
         if len(codes) == 0:
             return 0.0
 
-        bitstream_size_bits = len(bitstream) * 8
-        average_length = bitstream_size_bits / len(codes)
+        total_bits = calculate_total_code_bits(codes)
+        denominator = symbol_count if symbol_count is not None else len(codes)
+        if denominator <= 0:
+            return 0.0
+
+        average_length = total_bits / denominator
         return average_length
     except Exception as e:
         print(f"An error occurred while calculating average code length: {e}")
@@ -170,10 +227,12 @@ def calculate_text_compression_metrics(
         compression_ratio = calculate_compression_ratio(original_file_path, compressed_file_path)
         compression_factor = calculate_compression_factor(original_file_path, compressed_file_path)
         space_saving = calculate_space_saving(original_file_path, compressed_file_path)
+        size_difference = calculate_size_difference(original_file_path, compressed_file_path)
 
         return {
             "original_size": original_size,
             "compressed_size": compressed_size,
+            "difference_bytes": size_difference,
             "compression_ratio": round(compression_ratio, 4),
             "compression_factor": round(compression_factor, 4),
             "space_saving_percent": round(space_saving * 100, 2),
@@ -211,10 +270,12 @@ def calculate_image_compression_metrics(
         compression_ratio = calculate_compression_ratio(original_file_path, compressed_file_path)
         compression_factor = calculate_compression_factor(original_file_path, compressed_file_path)
         space_saving = calculate_space_saving(original_file_path, compressed_file_path)
+        size_difference = calculate_size_difference(original_file_path, compressed_file_path)
 
         return {
             "original_size": original_size,
             "compressed_size": compressed_size,
+            "difference_bytes": size_difference,
             "entropy": round(entropy, 4),
             "average_code_length": round(avg_code_length, 4),
             "compression_ratio": round(compression_ratio, 4),

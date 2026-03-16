@@ -30,6 +30,7 @@ from lzw_compression.core.decoder import (  # noqa: E402
     codes_to_text,
 )
 from lzw_compression.core.encoder import (  # noqa: E402
+    image_file_compute_differences,
     image_file_encoder_grayscale,
     image_file_encoder_grayscale_differences,
     text_file_encoder,
@@ -46,10 +47,10 @@ from lzw_compression.core.io import (  # noqa: E402
 )
 from lzw_compression.core.metrics import (  # noqa: E402
     calculate_average_code_length,
-    calculate_compression_factor,
     calculate_compression_ratio,
     calculate_entropy,
     calculate_file_size,
+    calculate_size_difference,
     calculate_space_saving,
 )
 
@@ -246,14 +247,14 @@ class LZWCompressionApp:
         frm_metrics.pack(side="right", fill="y", padx=(4, 0))
 
         labels_spec: list[tuple[str, str]] = [
-            ("Original Size:", "orig_size"),
+            ("Input Size:", "orig_size"),
             ("Compressed Size:", "comp_size"),
+            ("Difference:", "diff"),
             ("Compression Ratio (CR):", "cr"),
-            ("Compression Factor (CF):", "cf"),
-            ("Space Saving (SS):", "ss"),
             ("Entropy:", "entropy"),
             ("Avg Code Length:", "acl"),
-            ("Number of Codes:", "ncodes"),
+            ("Space Saving:", "ss"),
+            ("Symbols:", "nsymbols"),
         ]
         self._metric_labels: dict[str, ttk.Label] = {}
         for idx, (caption, key) in enumerate(labels_spec):
@@ -346,12 +347,15 @@ class LZWCompressionApp:
 
             if self._is_text:
                 self._text_content = open_text_file(path)
-                self._show_text_preview(self._text_content)
+                if self._text_content is not None:
+                    self._show_text_preview(self._text_content)
                 self._channel_combo.config(state="disabled")
                 self._channel_var.set("Grayscale")
 
             elif self._is_image:
                 self._image_array = open_image_file(path)
+                if self._image_array is None:
+                    raise ValueError("Image could not be loaded")
 
                 # Decompose into colour channels
                 red, green, blue = open_color_image_file(path)
@@ -590,8 +594,8 @@ class LZWCompressionApp:
 
         orig_size = calculate_file_size(self._src_path)
         comp_size = calculate_file_size(compressed_path)
+        diff_bytes = calculate_size_difference(self._src_path, compressed_path)
         cr = calculate_compression_ratio(self._src_path, compressed_path)
-        cf = calculate_compression_factor(self._src_path, compressed_path)
         ss = calculate_space_saving(self._src_path, compressed_path)
 
         raw_bytes = open_text_file(self._src_path).encode(
@@ -599,16 +603,22 @@ class LZWCompressionApp:
             errors="replace",
         )
         entropy = calculate_entropy(np.frombuffer(raw_bytes, dtype=np.uint8))
-        acl = calculate_average_code_length(self._bitstream, self._codes)
+        symbol_count = len(raw_bytes)
+        acl = calculate_average_code_length(
+            self._bitstream,
+            self._codes,
+            symbol_count=symbol_count,
+        )
 
         self._set_metric_values(
             orig_size=orig_size,
             comp_size=comp_size,
+            diff_bytes=diff_bytes,
             cr=cr,
-            cf=cf,
             ss=ss,
             entropy=entropy,
             acl=acl,
+            symbol_count=symbol_count,
         )
 
     def _display_metrics_text_from_sizes(
@@ -618,25 +628,32 @@ class LZWCompressionApp:
     ) -> None:
         """Metrics when we only know original byte count (decompression)."""
         comp_size = calculate_file_size(compressed_path)
+        diff_bytes = original_size - comp_size
         cr = comp_size / original_size if original_size else 0.0
-        cf = original_size / comp_size if comp_size else 0.0
         ss = (original_size - comp_size) / original_size if original_size else 0.0
 
         if self._text_content:
             raw = self._text_content.encode("latin-1", errors="replace")
             entropy = calculate_entropy(np.frombuffer(raw, dtype=np.uint8))
+            symbol_count = len(raw)
         else:
             entropy = 0.0
-        acl = calculate_average_code_length(self._bitstream, self._codes)
+            symbol_count = len(self._codes)
+        acl = calculate_average_code_length(
+            self._bitstream,
+            self._codes,
+            symbol_count=symbol_count,
+        )
 
         self._set_metric_values(
             orig_size=original_size,
             comp_size=comp_size,
+            diff_bytes=diff_bytes,
             cr=cr,
-            cf=cf,
             ss=ss,
             entropy=entropy,
             acl=acl,
+            symbol_count=symbol_count,
         )
 
     def _display_metrics_image(
@@ -647,24 +664,38 @@ class LZWCompressionApp:
         """Compute and display metrics for image compression."""
         orig_size = calculate_file_size(original_path)
         comp_size = calculate_file_size(compressed_path)
+        diff_bytes = calculate_size_difference(original_path, compressed_path)
         cr = calculate_compression_ratio(original_path, compressed_path)
-        cf = calculate_compression_factor(original_path, compressed_path)
         ss = calculate_space_saving(original_path, compressed_path)
 
         if self._active_array is not None:
-            entropy = calculate_entropy(self._active_array.flatten())
+            entropy_original = calculate_entropy(self._active_array.flatten())
+            entropy = entropy_original
+            if self._method_var.get() == "differences":
+                diff = image_file_compute_differences(self._active_array)
+                diff_offset = ((diff.astype(int) + 128) % 256).astype(np.uint8)
+                entropy_diff = calculate_entropy(diff_offset.flatten())
+                entropy = f"{entropy_original:.4f} / {entropy_diff:.4f} bits (orig/diff)"
         else:
             entropy = 0.0
-        acl = calculate_average_code_length(self._bitstream, self._codes)
+        symbol_count = (
+            int(self._active_array.size) if self._active_array is not None else len(self._codes)
+        )
+        acl = calculate_average_code_length(
+            self._bitstream,
+            self._codes,
+            symbol_count=symbol_count,
+        )
 
         self._set_metric_values(
             orig_size=orig_size,
             comp_size=comp_size,
+            diff_bytes=diff_bytes,
             cr=cr,
-            cf=cf,
             ss=ss,
             entropy=entropy,
             acl=acl,
+            symbol_count=symbol_count,
         )
 
     def _set_metric_values(  # noqa: PLR0913
@@ -672,21 +703,28 @@ class LZWCompressionApp:
         *,
         orig_size: int | float,
         comp_size: int | float,
+        diff_bytes: int,
         cr: float,
-        cf: float,
         ss: float,
-        entropy: float,
+        entropy: float | str,
         acl: float,
+        symbol_count: int,
     ) -> None:
         """Write pre-computed values into the metric labels."""
         self._metric_labels["orig_size"].config(text=self._fmt_size(orig_size))
         self._metric_labels["comp_size"].config(text=self._fmt_size(comp_size))
+        direction = "saved" if diff_bytes >= 0 else "expanded"
+        self._metric_labels["diff"].config(
+            text=f"{self._fmt_size(abs(diff_bytes))} {direction}",
+        )
         self._metric_labels["cr"].config(text=f"{cr:.4f}")
-        self._metric_labels["cf"].config(text=f"{cf:.2f}x")
         self._metric_labels["ss"].config(text=f"{ss * 100:.2f}%")
-        self._metric_labels["entropy"].config(text=f"{entropy:.4f} bits")
+        if isinstance(entropy, str):
+            self._metric_labels["entropy"].config(text=entropy)
+        else:
+            self._metric_labels["entropy"].config(text=f"{entropy:.4f} bits")
         self._metric_labels["acl"].config(text=f"{acl:.4f} bits")
-        self._metric_labels["ncodes"].config(text=f"{len(self._codes):,}")
+        self._metric_labels["nsymbols"].config(text=f"{symbol_count:,}")
 
     # ------------------------------------------------------------------
     # Clear
