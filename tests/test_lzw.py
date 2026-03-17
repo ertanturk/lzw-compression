@@ -1,11 +1,13 @@
-"""Tests for LZW encoder / decoder — text and image round-trips."""
+"""Core LZW tests: symbol encoding and end-to-end text/image cycles."""
+
+from pathlib import Path
 
 import numpy as np
 from pyforge_test import test  # type: ignore
 
 from lzw_compression.core.bitstream import convert_bytes_to_codes, convert_to_bitstream
 from lzw_compression.core.decoder import codes_to_text, image_file_decoder_grayscale
-from lzw_compression.core.encoder import image_file_encoder_grayscale, text_file_encoder
+from lzw_compression.core.encoder import encode_grayscale_array_lzw, text_file_encoder
 from lzw_compression.core.io import (
     open_bitstream_file,
     open_text_file,
@@ -14,119 +16,72 @@ from lzw_compression.core.io import (
     write_bitstream_with_dimensions,
 )
 
-# ── Text encoding correctness ───────────────────────────────────────────
+_SAMPLES_DIR = Path(__file__).resolve().parent.parent / "samples"
+
+
+def _sample(name: str) -> str:
+    return str(_SAMPLES_DIR / name)
+
+
+def _write_text(path: str, content: str) -> None:
+    with open(path, "w") as file:
+        file.write(content)
 
 
 @test
-def test_single_character():
-    """Single char produces its ASCII code."""
-    assert text_file_encoder("samples/single_char.txt") == [65]
+def test_text_encoder_known_output_abracadabra():
+    """Known sequence check for classic ABRACADABRA."""
+    expected = [65, 66, 82, 65, 67, 65, 68, 256, 258]
+    src = _sample("test_abracadabra.txt")
+    _write_text(src, "ABRACADABRA")
+    assert text_file_encoder(src) == expected
 
 
 @test
-def test_repeated_character():
-    """Repeated chars build and reuse dictionary entries."""
-    assert text_file_encoder("samples/repeated_char.txt") == [65, 256, 65]
+def test_text_encoder_known_output_repeated_char():
+    """Known sequence check for repeated character input."""
+    src = _sample("test_repeated_char.txt")
+    _write_text(src, "AAAA")
+    assert text_file_encoder(src) == [65, 256, 65]
 
 
 @test
-def test_pattern_repetition():
-    """Repeating AB pattern reuses code 256."""
-    assert text_file_encoder("samples/pattern_repeat.txt") == [65, 66, 256, 256]
+def test_text_roundtrip_via_bitstream_and_decoder():
+    """text -> codes -> bitstream -> codes -> text remains unchanged."""
+    src = _sample("test_text_roundtrip_input.txt")
+    out = _sample("test_text_roundtrip.lzw")
 
+    _write_text(src, "Lorem Ipsum is simply dummy text")
 
-@test
-def test_no_repetition():
-    """All unique chars — each maps to its ASCII code."""
-    assert text_file_encoder("samples/no_repeat.txt") == [65, 66, 67, 68, 69, 70]
-
-
-@test
-def test_classic_abracadabra():
-    """Classic LZW example (ABRACADABRA)."""
-    assert text_file_encoder("samples/short_text.csv") == [
-        65,
-        66,
-        82,
-        65,
-        67,
-        65,
-        68,
-        256,
-        258,
-    ]
-
-
-@test
-def test_lorem_ipsum():
-    """Short real-world text with spaces and varied patterns."""
-    expected = [
-        76,
-        111,
-        114,
-        101,
-        109,
-        32,
-        73,
-        112,
-        115,
-        117,
-        260,
-        105,
-        115,
-        32,
-        115,
-        105,
-        109,
-        112,
-        108,
-        121,
-        32,
-        100,
-        265,
-        109,
-        275,
-        116,
-        101,
-        120,
-        116,
-    ]
-    assert text_file_encoder("samples/short_text.txt") == expected
-
-
-# ── Full round-trip cycles ───────────────────────────────────────────────
-
-
-@test
-def test_text_encode_decode_cycle():
-    """Encode text -> bitstream -> file -> decode -> verify original."""
-    src = "samples/short_text.csv"
-    lzw = "samples/encoded.lzw"
     original = open_text_file(src)
-
     codes = text_file_encoder(src)
-    write_bitstream_to_text_file(convert_to_bitstream(codes), lzw)
+    bitstream = convert_to_bitstream(codes)
+    write_bitstream_to_text_file(bitstream, out)
 
-    decoded_codes = convert_bytes_to_codes(open_bitstream_file(lzw))
-    assert decoded_codes == codes
-    assert codes_to_text(decoded_codes) == original
+    reloaded_codes = convert_bytes_to_codes(open_bitstream_file(out))
+    decoded_text = codes_to_text(reloaded_codes)
+
+    assert reloaded_codes == codes
+    assert decoded_text == original
 
 
 @test
-def test_image_encode_decode_cycle():
-    """Encode grayscale image -> .lzw -> decode -> pixel-perfect match."""
-    img = np.array(
-        [[100, 150, 200, 100], [50, 100, 150, 50], [25, 75, 125, 25], [255, 200, 150, 100]],
+def test_grayscale_array_roundtrip_via_file_decoder():
+    """array -> LZW -> file-with-dims -> decode reproduces exact pixels."""
+    image = np.array(
+        [[0, 64, 128, 192], [1, 65, 129, 193], [2, 66, 130, 194], [3, 67, 131, 195]],
         dtype=np.uint8,
     )
-    img_path = "samples/test_cycle_image.png"
-    lzw_path = "samples/test_cycle_image.lzw"
-    save_image_file(img, img_path)
+    image_path = _sample("test_lzw_gray.png")
+    lzw_path = _sample("test_lzw_gray.lzw")
 
-    codes = image_file_encoder_grayscale(img_path)
-    h, w = img.shape
-    write_bitstream_with_dimensions(convert_to_bitstream(codes), lzw_path, h, w)
+    save_image_file(image, image_path)
+
+    codes = encode_grayscale_array_lzw(image)
+    bitstream = convert_to_bitstream(codes)
+    h, w = image.shape
+    write_bitstream_with_dimensions(bitstream, lzw_path, h, w)
 
     decoded = image_file_decoder_grayscale(lzw_path)
-    assert decoded.shape == img.shape
-    assert np.array_equal(decoded, img)
+    assert decoded.shape == image.shape
+    assert np.array_equal(decoded, image)

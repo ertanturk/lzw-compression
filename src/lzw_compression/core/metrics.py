@@ -133,12 +133,15 @@ def calculate_entropy(pixel_values: np.ndarray) -> float:
         float: The entropy value in bits.
     """
     try:
-        if len(pixel_values) == 0:
+        values = np.asarray(pixel_values).ravel()
+        symbol_count = values.size
+
+        if symbol_count == 0:
             return 0.0
 
         # Calculate frequency of each pixel value
-        _, counts = np.unique(pixel_values, return_counts=True)
-        probabilities = counts / len(pixel_values)
+        _, counts = np.unique(values, return_counts=True)
+        probabilities = counts / symbol_count
 
         # Calculate entropy: H = -Σ p(x) log2 p(x)
         entropy = float(np.sum(probabilities * np.log2(probabilities)) * -1.0)
@@ -183,16 +186,19 @@ def calculate_average_code_length(
 ) -> float:
     """Calculate the average code length in bits.
 
-    Average code length = (size_of_bitstream_in_bits) / (number_of_codes)
+    Average code length = (total_payload_code_bits) / (number_of_source_symbols)
 
     Args:
         bitstream (bytes): The encoded bitstream.
         codes (list[int]): The list of LZW codes.
+        symbol_count (int | None): Number of source symbols. If omitted,
+            defaults to len(codes).
 
     Returns:
         float: The average code length in bits.
     """
     try:
+        _ = bitstream  # kept for backward-compatible API
         if len(codes) == 0:
             return 0.0
 

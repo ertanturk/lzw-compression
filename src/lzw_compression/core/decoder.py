@@ -32,7 +32,6 @@ def text_file_decoder(file_path: str) -> list[int]:
 
 def codes_to_text(codes: list[int]) -> str:
     """Decodes a list of LZW codes back to the original text.
-
     Args:
         codes (list[int]): The list of LZW codes to decode.
 

@@ -30,20 +30,22 @@ from lzw_compression.core.decoder import (  # noqa: E402
     codes_to_text,
 )
 from lzw_compression.core.encoder import (  # noqa: E402
-    image_file_compute_differences,
-    image_file_encoder_grayscale,
-    image_file_encoder_grayscale_differences,
+    compute_left_top_differences_2d,
+    encode_grayscale_array_lzw,
+    encode_grayscale_array_lzw_with_differences,
     text_file_encoder,
 )
 from lzw_compression.core.io import (  # noqa: E402
     open_bitstream_file,
     open_bitstream_file_with_dimensions,
+    open_color_bitstreams_with_dimensions,
     open_color_image_file,
     open_image_file,
     open_text_file,
     save_image_file,
     write_bitstream_to_text_file,
     write_bitstream_with_dimensions,
+    write_color_bitstreams_with_dimensions,
 )
 from lzw_compression.core.metrics import (  # noqa: E402
     calculate_average_code_length,
@@ -461,26 +463,6 @@ class LZWCompressionApp:
 
             # --- Image path ------------------------------------------------
             if self._is_image:
-                self._on_channel_changed()
-                if self._active_array is None:
-                    messagebox.showerror("Error", "No channel data available.")
-                    return
-
-                tmp_gray_path = os.path.join(
-                    self._tmpdir,
-                    "_active_channel.png",
-                )
-                save_image_file(self._active_array, tmp_gray_path)
-
-                if method == "differences":
-                    codes = image_file_encoder_grayscale_differences(
-                        tmp_gray_path,
-                    )
-                else:
-                    codes = image_file_encoder_grayscale(tmp_gray_path)
-
-                bitstream = convert_to_bitstream(codes)
-
                 save_path = filedialog.asksaveasfilename(
                     title="Save compressed image",
                     defaultextension=".lzw",
@@ -490,15 +472,82 @@ class LZWCompressionApp:
                     self._set_status("Compression cancelled")
                     return
 
+                if self._image_array is None:
+                    messagebox.showerror("Error", "No image data available.")
+                    return
+
+                is_color = (
+                    len(self._image_array.shape) == _MIN_RGB_CHANNELS
+                    and self._image_array.shape[2] >= _MIN_RGB_CHANNELS
+                )
+
+                # Color image: split into RGB and compress each channel independently
+                if is_color:
+                    red = self._channel_arrays.get("Red")
+                    green = self._channel_arrays.get("Green")
+                    blue = self._channel_arrays.get("Blue")
+                    if red is None or green is None or blue is None:
+                        red, green, blue = open_color_image_file(self._src_path)
+
+                    if method == "differences":
+                        codes_r = encode_grayscale_array_lzw_with_differences(red)
+                        codes_g = encode_grayscale_array_lzw_with_differences(green)
+                        codes_b = encode_grayscale_array_lzw_with_differences(blue)
+                    else:
+                        codes_r = encode_grayscale_array_lzw(red)
+                        codes_g = encode_grayscale_array_lzw(green)
+                        codes_b = encode_grayscale_array_lzw(blue)
+
+                    bitstream_r = convert_to_bitstream(codes_r)
+                    bitstream_g = convert_to_bitstream(codes_g)
+                    bitstream_b = convert_to_bitstream(codes_b)
+
+                    h, w = self._image_array.shape[:2]
+                    write_color_bitstreams_with_dimensions(
+                        bitstream_r,
+                        bitstream_g,
+                        bitstream_b,
+                        save_path,
+                        h,
+                        w,
+                    )
+
+                    self._codes = codes_r + codes_g + codes_b
+                    self._bitstream = bitstream_r + bitstream_g + bitstream_b
+                    self._compressed_path = save_path
+                    self._active_array = self._image_array
+                    self._display_metrics_image(self._src_path, save_path)
+                    self._set_status(
+                        f"Saved compressed color image -> {Path(save_path).name}",
+                    )
+                    messagebox.showinfo(
+                        "Done",
+                        "Color image compressed successfully (R/G/B channels).",
+                    )
+                    return
+
+                # Grayscale image: compress a single channel
+                self._on_channel_changed()
+                if self._active_array is None:
+                    messagebox.showerror("Error", "No channel data available.")
+                    return
+
+                if method == "differences":
+                    codes = encode_grayscale_array_lzw_with_differences(self._active_array)
+                else:
+                    codes = encode_grayscale_array_lzw(self._active_array)
+
+                bitstream = convert_to_bitstream(codes)
+
                 h, w = self._active_array.shape[:2]
                 write_bitstream_with_dimensions(bitstream, save_path, h, w)
 
                 self._codes = codes
                 self._bitstream = bitstream
                 self._compressed_path = save_path
-                self._display_metrics_image(tmp_gray_path, save_path)
+                self._display_metrics_image(self._src_path, save_path)
                 self._set_status(
-                    f"Saved compressed image -> {Path(save_path).name}",
+                    f"Saved compressed grayscale image -> {Path(save_path).name}",
                 )
                 messagebox.showinfo("Done", "Image compressed successfully.")
                 return
@@ -523,6 +572,45 @@ class LZWCompressionApp:
         self._set_status("Decompressing...")
 
         try:
+            # Try color container first
+            red_bs, green_bs, blue_bs, height, width = open_color_bitstreams_with_dimensions(
+                path,
+            )
+
+            r_codes = convert_bytes_to_codes(red_bs)
+            g_codes = convert_bytes_to_codes(green_bs)
+            b_codes = convert_bytes_to_codes(blue_bs)
+
+            if method == "differences":
+                red = codes_to_image_grayscale_differences(r_codes, (height, width))
+                green = codes_to_image_grayscale_differences(g_codes, (height, width))
+                blue = codes_to_image_grayscale_differences(b_codes, (height, width))
+            else:
+                red = codes_to_image_grayscale(r_codes, (height, width))
+                green = codes_to_image_grayscale(g_codes, (height, width))
+                blue = codes_to_image_grayscale(b_codes, (height, width))
+
+            decoded_color = np.stack((red, green, blue), axis=2).astype(np.uint8)
+
+            self._show_image_preview(decoded_color)
+            self._image_array = decoded_color
+            self._channel_arrays = {"Red": red, "Green": green, "Blue": blue}
+            self._update_channel_combo(True)
+            self._active_array = decoded_color
+            self._codes = r_codes + g_codes + b_codes
+            self._bitstream = red_bs + green_bs + blue_bs
+            self._compressed_path = path
+
+            tmp_decoded = os.path.join(self._tmpdir, "_decoded_color.png")
+            save_image_file(decoded_color, tmp_decoded)
+            self._display_metrics_image(tmp_decoded, path)
+            self._set_status(f"Decompressed color image ({height}x{width})")
+            return
+
+        except Exception:
+            pass  # fall through to grayscale / text decompression
+
+        try:
             # Try as image first (file has 8-byte dimension header)
             bitstream_raw, height, width = open_bitstream_file_with_dimensions(
                 path,
@@ -545,6 +633,8 @@ class LZWCompressionApp:
                 self._show_image_preview(decoded_img)
                 self._image_array = decoded_img
                 self._active_array = decoded_img
+                self._channel_arrays = {}
+                self._update_channel_combo(False)
                 self._codes = codes
                 self._bitstream = bitstream_raw
                 self._compressed_path = path
@@ -668,19 +758,26 @@ class LZWCompressionApp:
         cr = calculate_compression_ratio(original_path, compressed_path)
         ss = calculate_space_saving(original_path, compressed_path)
 
-        if self._active_array is not None:
-            entropy_original = calculate_entropy(self._active_array.flatten())
+        metric_array = self._image_array if self._image_array is not None else self._active_array
+
+        if metric_array is not None:
+            entropy_original = calculate_entropy(metric_array.flatten())
             entropy = entropy_original
             if self._method_var.get() == "differences":
-                diff = image_file_compute_differences(self._active_array)
-                diff_offset = ((diff.astype(int) + 128) % 256).astype(np.uint8)
-                entropy_diff = calculate_entropy(diff_offset.flatten())
+                if len(metric_array.shape) == 2:
+                    diff = compute_left_top_differences_2d(metric_array)
+                    diff_offset = ((diff.astype(int) + 128) % 256).astype(np.uint8)
+                    entropy_diff = calculate_entropy(diff_offset.flatten())
+                else:
+                    diffs: list[np.ndarray] = []
+                    for idx in range(_MIN_RGB_CHANNELS):
+                        diff = compute_left_top_differences_2d(metric_array[:, :, idx])
+                        diffs.append(((diff.astype(int) + 128) % 256).astype(np.uint8).flatten())
+                    entropy_diff = calculate_entropy(np.concatenate(diffs))
                 entropy = f"{entropy_original:.4f} / {entropy_diff:.4f} bits (orig/diff)"
         else:
             entropy = 0.0
-        symbol_count = (
-            int(self._active_array.size) if self._active_array is not None else len(self._codes)
-        )
+        symbol_count = int(metric_array.size) if metric_array is not None else len(self._codes)
         acl = calculate_average_code_length(
             self._bitstream,
             self._codes,

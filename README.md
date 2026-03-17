@@ -6,13 +6,13 @@ A professional Python implementation of the **Lempel-Ziv-Welch (LZW)** dictionar
 
 ## Features
 
-- **Text & Image Compression** — LZW encoder/decoder for both plaintext and grayscale images
+- **Text & Image Compression** — LZW encoder/decoder for plaintext and grayscale images
 - **2D Encoding** — Optional row-wise and column-wise difference preprocessing for smoother images
-- **RGB Channel Decomposition** — Extract and compress individual colour channels independently
+- **RGB Channel Decomposition** — Split into R/G/B, compress each channel independently, and reconstruct on decode
 - **Variable-Width Bitstream** — Efficient 9–12 bit encoding that grows with dictionary size
 - **Compression Metrics** — Compression Ratio (CR), Compression Factor (CF), Space Saving (SS), entropy, average code length
 - **Tkinter GUI** — User-friendly graphical interface for compression/decompression and metrics visualization
-- **Professional Test Suite** — 23 comprehensive unit tests with 100% pass rate
+- **Professional Test Suite** — 24 unit tests with full pass status
 
 ## Quick Start
 
@@ -77,7 +77,7 @@ src/lzw_compression/
 
 ### Algorithm Overview
 
-1. **Encoder** — Maintains a dictionary of string→code mappings (256–4096 entries). Reads input symbol by symbol, outputting dictionary codes and building new patterns.
+1. **Encoder** — Maintains a dictionary of string→code mappings (256–4095 codes available in 12-bit mode). Reads input symbol by symbol, outputting dictionary codes and building new patterns.
 2. **Bitstream** — Encodes variable-width codes (9–12 bits) into byte sequences; reverses the process on decode.
 3. **2D Encoding** (optional) — Computes row-wise and column-wise pixel differences before LZW to improve compression on smooth images.
 4. **Decoder** — Reconstructs the original dictionary on-the-fly from the code stream, reversing if needed.
@@ -95,13 +95,14 @@ print(codes)  # [65, 66, 82, 65, 67, 65, 68, 256, 258]
 ### Image Compression with Delta Encoding
 
 ```python
-from lzw_compression.core.encoder import image_file_encoder_grayscale_differences
-from lzw_compression.core.io import write_bitstream_with_dimensions
+from lzw_compression.core.encoder import encode_grayscale_array_lzw_with_differences
+from lzw_compression.core.io import open_image_file, write_bitstream_with_dimensions
 from lzw_compression.core.bitstream import convert_to_bitstream
 
-codes = image_file_encoder_grayscale_differences("image.png")
+arr = open_image_file("image.png")
+codes = encode_grayscale_array_lzw_with_differences(arr)
 bitstream = convert_to_bitstream(codes)
-write_bitstream_with_dimensions(bitstream, "image.lzw", h=256, w=256)
+write_bitstream_with_dimensions(bitstream, "image.lzw", height=256, width=256)
 ```
 
 ### Channel Extraction
@@ -110,6 +111,33 @@ write_bitstream_with_dimensions(bitstream, "image.lzw", h=256, w=256)
 from lzw_compression.core.io import open_color_image_file
 red, green, blue = open_color_image_file("color_image.png")
 # Each channel is a 2D numpy array (H x W)
+```
+
+### RGB Container (Store + Reconstruct)
+
+```python
+import numpy as np
+from lzw_compression.core.bitstream import convert_bytes_to_codes, convert_to_bitstream
+from lzw_compression.core.decoder import codes_to_image_grayscale
+from lzw_compression.core.encoder import encode_grayscale_array_lzw
+from lzw_compression.core.io import (
+    open_color_bitstreams_with_dimensions,
+    open_color_image_file,
+    write_color_bitstreams_with_dimensions,
+)
+
+r, g, b = open_color_image_file("color_image.png")
+r_bs = convert_to_bitstream(encode_grayscale_array_lzw(r))
+g_bs = convert_to_bitstream(encode_grayscale_array_lzw(g))
+b_bs = convert_to_bitstream(encode_grayscale_array_lzw(b))
+
+write_color_bitstreams_with_dimensions(r_bs, g_bs, b_bs, "color.lzw", height=r.shape[0], width=r.shape[1])
+
+r2_bs, g2_bs, b2_bs, h, w = open_color_bitstreams_with_dimensions("color.lzw")
+r2 = codes_to_image_grayscale(convert_bytes_to_codes(r2_bs), (h, w))
+g2 = codes_to_image_grayscale(convert_bytes_to_codes(g2_bs), (h, w))
+b2 = codes_to_image_grayscale(convert_bytes_to_codes(b2_bs), (h, w))
+rgb = np.stack((r2, g2, b2), axis=2)
 ```
 
 ## Requirements
@@ -121,10 +149,11 @@ red, green, blue = open_color_image_file("color_image.png")
 
 ## Testing
 
-All 23 tests pass:
+All 24 tests pass:
 
 ```bash
-python -m pyforge_test
+source .venv/bin/activate
+pyforge
 ```
 
 Test coverage includes:
@@ -133,7 +162,7 @@ Test coverage includes:
 - Full encode–decode round-trips for text and images
 - 2D encoding with varied pixel patterns
 - Compression metrics validation (CR, CF, SS, entropy)
-- Per-channel RGB encoding/decoding
+- Per-channel RGB split/compress/store/decode/reconstruct flow
 - RGB channel decomposition accuracy
 
 ## Code Quality

@@ -1,0 +1,11 @@
+Level 1: Text compression and decompression using LZW
+
+Level 2: Grayscale image compression
+
+Level 3: Grayscale image compression with difference preprocessing
+
+Level 4: Color image compression using RGB channel decomposition
+
+Level 5: Color image compression with differences
+
+Level 6: A full graphical user interface

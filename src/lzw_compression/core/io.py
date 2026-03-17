@@ -3,6 +3,8 @@ import sys
 import numpy as np
 from PIL import Image
 
+_COLOR_MAGIC = b"LZWC"
+
 
 def open_text_file(file_path: str) -> str:
     """Open and read a text file, returning its content as a string.
@@ -174,6 +176,95 @@ def open_bitstream_file_with_dimensions(file_path: str) -> tuple[bytes, int, int
             # Read the remaining bitstream
             bitstream = file.read()
             return bitstream, height, width
+    except FileNotFoundError:
+        print(f"File {file_path} not found.")
+        sys.exit(1)
+    except Exception as e:
+        print(f"An error occurred while opening the file '{file_path}': {e}")
+        sys.exit(1)
+
+
+def write_color_bitstreams_with_dimensions(  # noqa: PLR0913
+    red_bitstream: bytes,
+    green_bitstream: bytes,
+    blue_bitstream: bytes,
+    output_file_path: str,
+    height: int,
+    width: int,
+) -> None:
+    """Write RGB bitstreams with dimensions and channel lengths.
+
+    File layout (little-endian):
+    - 4 bytes magic: b"LZWC"
+    - 4 bytes height
+    - 4 bytes width
+    - 4 bytes red length
+    - 4 bytes green length
+    - 4 bytes blue length
+    - red payload, green payload, blue payload
+    """
+    try:
+        with open(output_file_path, "wb") as file:
+            file.write(_COLOR_MAGIC)
+            file.write(height.to_bytes(4, byteorder="little"))
+            file.write(width.to_bytes(4, byteorder="little"))
+            file.write(len(red_bitstream).to_bytes(4, byteorder="little"))
+            file.write(len(green_bitstream).to_bytes(4, byteorder="little"))
+            file.write(len(blue_bitstream).to_bytes(4, byteorder="little"))
+            file.write(red_bitstream)
+            file.write(green_bitstream)
+            file.write(blue_bitstream)
+    except Exception as e:
+        print(f"An error occurred while writing to the file '{output_file_path}': {e}")
+        sys.exit(1)
+
+
+def open_color_bitstreams_with_dimensions(file_path: str) -> tuple[bytes, bytes, bytes, int, int]:
+    """Open RGB bitstreams with dimensions and channel lengths.
+
+    Returns:
+        tuple[bytes, bytes, bytes, int, int]:
+            (red_bitstream, green_bitstream, blue_bitstream, height, width)
+    """
+    try:
+        with open(file_path, "rb") as file:
+            magic = file.read(4)
+            if magic != _COLOR_MAGIC:
+                raise ValueError("Not a color LZW container")
+
+            height_bytes = file.read(4)
+            width_bytes = file.read(4)
+            red_len_bytes = file.read(4)
+            green_len_bytes = file.read(4)
+            blue_len_bytes = file.read(4)
+
+            if (
+                len(height_bytes) != 4  # noqa: PLR2004
+                or len(width_bytes) != 4  # noqa: PLR2004
+                or len(red_len_bytes) != 4  # noqa: PLR2004
+                or len(green_len_bytes) != 4  # noqa: PLR2004
+                or len(blue_len_bytes) != 4  # noqa: PLR2004
+            ):
+                raise ValueError("Corrupted color LZW header")
+
+            height = int.from_bytes(height_bytes, byteorder="little")
+            width = int.from_bytes(width_bytes, byteorder="little")
+            red_len = int.from_bytes(red_len_bytes, byteorder="little")
+            green_len = int.from_bytes(green_len_bytes, byteorder="little")
+            blue_len = int.from_bytes(blue_len_bytes, byteorder="little")
+
+            red_bitstream = file.read(red_len)
+            green_bitstream = file.read(green_len)
+            blue_bitstream = file.read(blue_len)
+
+            if (
+                len(red_bitstream) != red_len
+                or len(green_bitstream) != green_len
+                or len(blue_bitstream) != blue_len
+            ):
+                raise ValueError("Corrupted color LZW payload")
+
+            return red_bitstream, green_bitstream, blue_bitstream, height, width
     except FileNotFoundError:
         print(f"File {file_path} not found.")
         sys.exit(1)

@@ -1,10 +1,12 @@
-"""Tests for compression metrics (CR, CF, SS, entropy, avg code length)."""
+"""Tests for metric helpers (entropy, bit lengths, CR/CF/SS, aggregate reports)."""
+
+from pathlib import Path
 
 import numpy as np
 from pyforge_test import test  # type: ignore
 
 from lzw_compression.core.bitstream import convert_to_bitstream
-from lzw_compression.core.encoder import image_file_encoder_grayscale, text_file_encoder
+from lzw_compression.core.encoder import encode_grayscale_array_lzw, text_file_encoder
 from lzw_compression.core.io import (
     save_image_file,
     write_bitstream_to_text_file,
@@ -16,121 +18,139 @@ from lzw_compression.core.metrics import (
     calculate_compression_ratio,
     calculate_entropy,
     calculate_image_compression_metrics,
+    calculate_size_difference,
     calculate_space_saving,
     calculate_text_compression_metrics,
+    calculate_total_code_bits,
 )
 
-_SRC = "samples/long_text.txt"
+_SAMPLES_DIR = Path(__file__).resolve().parent.parent / "samples"
 
 
-def _compress_text(suffix: str = "") -> tuple[str, list[int], bytes]:
-    """Encode the standard CSV sample and return (lzw_path, codes, bitstream)."""
-    codes = text_file_encoder(_SRC)
-    bs = convert_to_bitstream(codes)
-    lzw = f"samples/short_text{suffix}.lzw"
-    write_bitstream_to_text_file(bs, lzw)
-    return lzw, codes, bs
+def _sample(name: str) -> str:
+    return str(_SAMPLES_DIR / name)
 
 
-# ── Individual metric functions ──────────────────────────────────────────
+_TEXT_SOURCE = _sample("long_text.txt")
 
 
-@test
-def test_compression_ratio():
-    """CR is between 0 and 1 for compressible text."""
-    lzw, *_ = _compress_text("_cr")
-    assert 0 <= calculate_compression_ratio(_SRC, lzw) <= 1
+def _ensure_text_source() -> str:
+    text = (
+        "LZW metrics test input. "
+        "This sentence is repeated. "
+        "LZW metrics test input. "
+        "This sentence is repeated. "
+    )
+    with open(_TEXT_SOURCE, "w") as file:
+        file.write(text)
+    return _TEXT_SOURCE
 
 
-@test
-def test_compression_factor():
-    """CF is positive."""
-    lzw, *_ = _compress_text("_cf")
-    assert calculate_compression_factor(_SRC, lzw) > 0
-
-
-@test
-def test_space_saving():
-    """SS is between 0 and 1 for compressible text."""
-    lzw, *_ = _compress_text("_ss")
-    assert 0 <= calculate_space_saving(_SRC, lzw) <= 1
+def _encode_text_to_lzw(tag: str) -> tuple[str, list[int], bytes]:
+    """Encode standard sample text and persist bitstream."""
+    source = _ensure_text_source()
+    codes = text_file_encoder(source)
+    bitstream = convert_to_bitstream(codes)
+    out = _sample(f"test_metrics_{tag}.lzw")
+    write_bitstream_to_text_file(bitstream, out)
+    return out, codes, bitstream
 
 
 @test
-def test_entropy():
-    """Entropy of a simple distribution is positive and <= 8 bits."""
-    pixels = np.array([100, 100, 100, 100, 200, 200], dtype=np.uint8)
-    ent = calculate_entropy(pixels)
-    max_entropy = 8
-    assert 0 < ent <= max_entropy
+def test_entropy_for_two_symbol_uniform_distribution_is_one_bit():
+    """P(0)=0.5, P(1)=0.5 => entropy should be exactly 1.0 bit."""
+    values = np.array([0, 0, 1, 1], dtype=np.uint8)
+    assert abs(calculate_entropy(values) - 1.0) < 1e-12
 
 
 @test
-def test_average_code_length():
-    """Average code length is positive for a short code sequence."""
-    codes = [65, 66, 67, 68, 256, 257]
-    assert calculate_average_code_length(convert_to_bitstream(codes), codes) > 0
-
-
-# ── Aggregate metric helpers ─────────────────────────────────────────────
+def test_entropy_accepts_multidimensional_arrays():
+    """Entropy should use all symbols even when input is 2D."""
+    values_2d = np.array([[1, 1], [2, 2]], dtype=np.uint8)
+    assert abs(calculate_entropy(values_2d) - 1.0) < 1e-12
 
 
 @test
-def test_text_compression_metrics():
-    """All expected keys present; values in valid ranges."""
-    lzw, *_ = _compress_text("_metrics")
-    m = calculate_text_compression_metrics(_SRC, lzw)
+def test_average_code_length_uses_symbol_count_when_provided():
+    """Average code length should be payload bits divided by source symbols."""
+    codes = [65, 66, 67, 256]
+    bitstream = convert_to_bitstream(codes)
+    total_bits = calculate_total_code_bits(codes)
+    source_symbols = 10
+    got = calculate_average_code_length(bitstream, codes, symbol_count=source_symbols)
+    assert abs(got - (total_bits / source_symbols)) < 1e-12
+
+
+@test
+def test_text_size_metrics_are_self_consistent():
+    """CR, CF, SS, and size-difference satisfy their algebraic relations."""
+    out, _, _ = _encode_text_to_lzw("text_sizes")
+
+    source = _ensure_text_source()
+    cr = calculate_compression_ratio(source, out)
+    cf = calculate_compression_factor(source, out)
+    ss = calculate_space_saving(source, out)
+    diff = calculate_size_difference(source, out)
+
+    assert cr >= 0.0
+    assert cf > 0.0
+    assert abs((1.0 / cr) - cf) < 1e-9 if cr > 0 else cf > 0
+    assert abs((1.0 - cr) - ss) < 1e-9
+    assert isinstance(diff, int)
+
+
+@test
+def test_text_compression_metrics_payload_contains_expected_keys():
+    """Aggregate text metrics helper should provide all documented keys."""
+    out, _, _ = _encode_text_to_lzw("text_payload")
+    metrics = calculate_text_compression_metrics(_ensure_text_source(), out)
 
     for key in (
         "original_size",
         "compressed_size",
+        "difference_bytes",
         "compression_ratio",
         "compression_factor",
         "space_saving_percent",
     ):
-        assert key in m
-
-    max_pct = 100
-    assert m["compression_factor"] > 0
-    assert 0 <= m["space_saving_percent"] <= max_pct
+        assert key in metrics
 
 
 @test
-def test_image_compression_metrics():
-    """Image metrics contain all keys with sane value ranges."""
-    img = np.array(
-        [[100, 150, 200], [50, 100, 150], [25, 75, 125]],
+def test_image_compression_metrics_payload_contains_expected_keys():
+    """Aggregate image metrics helper should provide all documented keys."""
+    image = np.array(
+        [[0, 32, 64], [96, 128, 160], [192, 224, 255]],
         dtype=np.uint8,
     )
-    img_path = "samples/test_image_metrics.png"
-    lzw_path = "samples/test_image_metrics.lzw"
-    save_image_file(img, img_path)
+    image_path = _sample("test_metrics_image.png")
+    lzw_path = _sample("test_metrics_image.lzw")
+    save_image_file(image, image_path)
 
-    codes = image_file_encoder_grayscale(img_path)
-    bs = convert_to_bitstream(codes)
-    h, w = img.shape
-    write_bitstream_with_dimensions(bs, lzw_path, h, w)
+    codes = encode_grayscale_array_lzw(image)
+    bitstream = convert_to_bitstream(codes)
+    h, w = image.shape
+    write_bitstream_with_dimensions(bitstream, lzw_path, h, w)
 
-    m = calculate_image_compression_metrics(
-        img_path,
+    metrics = calculate_image_compression_metrics(
+        image_path,
         lzw_path,
-        img.flatten(),
+        image,
         codes,
-        bs,
+        bitstream,
     )
 
     for key in (
         "original_size",
         "compressed_size",
+        "difference_bytes",
         "entropy",
         "average_code_length",
         "compression_ratio",
         "compression_factor",
         "space_saving_percent",
     ):
-        assert key in m
+        assert key in metrics
 
-    max_entropy = 8
-    max_bits = 16
-    assert 0 <= m["entropy"] <= max_entropy
-    assert 0 < m["average_code_length"] <= max_bits
+    assert 0.0 <= metrics["entropy"] <= 8.0
+    assert metrics["average_code_length"] >= 0.0

@@ -8,6 +8,36 @@ from lzw_compression.core.io import open_image_file, open_text_file
 MAX_CODE = 4096
 
 
+def _lzw_encode_symbol_stream(symbol_stream: list[str]) -> list[int]:
+    """Encode a symbol stream using the project's 12-bit LZW variant."""
+    dictionary: dict[str, int] = {chr(i): i for i in range(256)}
+    next_free_code: int = 256
+    result: list[int] = []
+
+    current_string: str = ""
+    for symbol in symbol_stream:
+        combined_string: str = current_string + symbol
+
+        if combined_string in dictionary:
+            current_string = combined_string
+        else:
+            result.append(dictionary[current_string])
+            if next_free_code < MAX_CODE:
+                dictionary[combined_string] = next_free_code
+                next_free_code += 1
+            current_string = symbol
+
+    if current_string:
+        result.append(dictionary[current_string])
+
+    return result
+
+
+def _to_symbol_stream_from_uint8(values: np.ndarray) -> list[str]:
+    """Convert uint8-compatible values to single-byte character symbols."""
+    return [chr(int(value)) for value in values]
+
+
 def text_file_encoder(file_path: str) -> list[int]:
     """Encodes a text file using the LZW compression algorithm.
 
@@ -18,36 +48,28 @@ def text_file_encoder(file_path: str) -> list[int]:
         list[int]: A list of integers representing the LZW encoded output.
     """
     try:
-        dictionary: dict[str, int] = {chr(i): i for i in range(256)}  # Initialize dictionary
-        next_free_code: int = 256  # Next available code for new entries
-        result: list[int] = []  # List to store the output codes
-
-        # Open the text file and read its content
         content: str = open_text_file(file_path)
-        current_string: str = ""  # Initialize the current string as empty
-
-        # Iterate through each character in the content
-        for symbol in content:
-            combined_string: str = (
-                current_string + symbol
-            )  # Combine current string with the new symbol
-
-            # Check if the combined string is in the dictionary
-            if combined_string in dictionary:
-                current_string = combined_string  # Update current string to the combined string
-            else:
-                result.append(dictionary[current_string])  # Output the code for the current string
-                if next_free_code < MAX_CODE:  # Only add if within 12-bit limit
-                    dictionary[combined_string] = (
-                        next_free_code  # Add combined string to the dictionary
-                    )
-                    next_free_code += 1  # Increment the next free code
-                current_string = symbol  # Start a new current string with the symbol
-        if current_string:  # Output the code for the last current string if it's not empty
-            result.append(dictionary[current_string])
-        return result
+        return _lzw_encode_symbol_stream(list(content))
     except Exception as e:
         print(f"An error occurred during encoding text file '{file_path}': {e}")
+        sys.exit(1)
+
+
+def encode_grayscale_array_lzw(image_array: np.ndarray) -> list[int]:
+    """Encode a grayscale image array with LZW.
+
+    Args:
+        image_array (np.ndarray): 2D grayscale image array.
+
+    Returns:
+        list[int]: LZW output codes.
+    """
+    try:
+        pixel_values = image_array.flatten()
+        symbols = _to_symbol_stream_from_uint8(pixel_values)
+        return _lzw_encode_symbol_stream(symbols)
+    except Exception as e:
+        print(f"An error occurred during encoding grayscale image array: {e}")
         sys.exit(1)
 
 
@@ -61,57 +83,27 @@ def image_file_encoder_grayscale(file_path: str) -> list[int]:
         list[int]: A list of integers representing the LZW encoded output.
     """
     try:
-        dictionary: dict[str, int] = {chr(i): i for i in range(256)}  # Initialize dictionary
-        next_free_code: int = 256  # Next available code for new entries
-        result: list[int] = []  # List to store the output codes
-
-        # Open the image file and read its content as a NumPy array
         image_array = open_image_file(file_path)
-
-        # Flatten the image array to a 1D list of pixel values
-        pixel_values = image_array.flatten()
-
-        current_string: str = ""  # Initialize the current string as empty
-
-        # Iterate through each pixel value in the flattened array
-        for pixel in pixel_values:
-            symbol = chr(pixel)  # Convert pixel value to a character
-            combined_string: str = (
-                current_string + symbol
-            )  # Combine current string with the new symbol
-
-            # Check if the combined string is in the dictionary
-            if combined_string in dictionary:
-                current_string = combined_string  # Update current string to the combined string
-            else:
-                result.append(dictionary[current_string])  # Output the code for the current string
-                if next_free_code < MAX_CODE:  # Only add if within 12-bit limit
-                    dictionary[combined_string] = (
-                        next_free_code  # Add combined string to the dictionary
-                    )
-                    next_free_code += 1  # Increment the next free code
-                current_string = symbol  # Start a new current string with the symbol
-        if current_string:  # Output the code for the last current string if it's not empty
-            result.append(dictionary[current_string])
-        return result
+        return encode_grayscale_array_lzw(image_array)
     except Exception as e:
         print(f"An error occurred during encoding image file '{file_path}': {e}")
         sys.exit(1)
 
 
-def image_file_compute_differences(arr: np.ndarray) -> np.ndarray:
-    """Compute 2D differences: row-wise for all pixels, column-wise for first column.
+def image_array_encoder_grayscale(image_array: np.ndarray) -> list[int]:
+    """Encodes a grayscale image array using the LZW compression algorithm.
 
     Args:
-        arr (np.ndarray): 2D image array (height x width).
+        image_array (np.ndarray): 2D grayscale image array.
 
     Returns:
-        np.ndarray: Array with differences:
-            - [0,0]: Original pixel (no difference)
-            - [0,1:]: Differences from left neighbor (row-wise)
-            - [1:,0]: Differences from top neighbor (column-wise)
-            - [1:,1:]: Differences from left neighbor (row-wise)
+        list[int]: A list of integers representing the LZW encoded output.
     """
+    return encode_grayscale_array_lzw(image_array)
+
+
+def compute_left_top_differences_2d(arr: np.ndarray) -> np.ndarray:
+    """Compute 2D predictive deltas using left-neighbour and top-neighbour rules."""
     try:
         diff = np.zeros_like(arr, dtype=int)
 
@@ -133,6 +125,38 @@ def image_file_compute_differences(arr: np.ndarray) -> np.ndarray:
         sys.exit(1)
 
 
+def image_file_compute_differences(arr: np.ndarray) -> np.ndarray:
+    """Compute 2D differences: row-wise for all pixels, column-wise for first column.
+
+    Args:
+        arr (np.ndarray): 2D image array (height x width).
+
+    Returns:
+        np.ndarray: Array with differences:
+            - [0,0]: Original pixel (no difference)
+            - [0,1:]: Differences from left neighbor (row-wise)
+            - [1:,0]: Differences from top neighbor (column-wise)
+            - [1:,1:]: Differences from left neighbor (row-wise)
+    """
+    return compute_left_top_differences_2d(arr)
+
+
+def encode_grayscale_array_lzw_with_differences(image_array: np.ndarray) -> list[int]:
+    """Encode grayscale array by left/top 2D deltas followed by LZW."""
+    try:
+        diff_array = compute_left_top_differences_2d(image_array)
+
+        # Offset differences to 0-255 range (to handle negative values)
+        diff_array_offset: np.ndarray = ((diff_array.astype(int) + 128) % 256).astype(int)
+
+        pixel_values = diff_array_offset.flatten()
+        symbols = _to_symbol_stream_from_uint8(pixel_values)
+        return _lzw_encode_symbol_stream(symbols)
+    except Exception as e:
+        print(f"An error occurred during encoding grayscale image array with differences: {e}")
+        sys.exit(1)
+
+
 def image_file_encoder_grayscale_differences(file_path: str) -> list[int]:
     """Encodes a grayscale image using 2D delta encoding + LZW compression.
 
@@ -147,45 +171,20 @@ def image_file_encoder_grayscale_differences(file_path: str) -> list[int]:
         list[int]: List of LZW encoded codes from delta-encoded pixels.
     """
     try:
-        # Open the image file and read its content as a NumPy array
         image_array = open_image_file(file_path)
-
-        # Compute 2D differences (row-wise and column-wise)
-        diff_array = image_file_compute_differences(image_array)
-
-        # Offset differences to 0-255 range (to handle negative values)
-        # Differences range from -255 to +255, we shift by 128 to get 0-255
-        diff_array_offset: np.ndarray = ((diff_array.astype(int) + 128) % 256).astype(int)
-
-        # Flatten the difference array to a 1D list of pixel values
-        pixel_values = diff_array_offset.flatten()
-
-        # Encode the differences using LZW
-        dictionary: dict[str, int] = {chr(i): i for i in range(256)}  # Initialize dictionary
-        next_free_code: int = 256  # Next available code for new entries
-        result: list[int] = []  # List to store the output codes
-
-        current_string: str = ""  # Initialize the current string as empty
-
-        for pixel in pixel_values:
-            symbol = chr(int(pixel))  # Convert pixel value to a character
-            combined_string: str = (
-                current_string + symbol
-            )  # Combine current string with the new symbol
-
-            if combined_string in dictionary:
-                current_string = combined_string  # Update current string to the combined string
-            else:
-                result.append(dictionary[current_string])  # Output the code for the current string
-                if next_free_code < MAX_CODE:  # Only add if within 12-bit limit
-                    dictionary[combined_string] = (
-                        next_free_code  # Add combined string to the dictionary
-                    )
-                    next_free_code += 1  # Increment the next free code
-                current_string = symbol  # Start a new current string with the symbol
-        if current_string:  # Output the code for the last current string if it's not empty
-            result.append(dictionary[current_string])
-        return result
+        return encode_grayscale_array_lzw_with_differences(image_array)
     except Exception as e:
         print(f"An error occurred during encoding image file with differences '{file_path}': {e}")
         sys.exit(1)
+
+
+def image_array_encoder_grayscale_differences(image_array: np.ndarray) -> list[int]:
+    """Encodes a grayscale image array using 2D delta encoding + LZW compression.
+
+    Args:
+        image_array (np.ndarray): 2D grayscale image array.
+
+    Returns:
+        list[int]: List of LZW encoded codes from delta-encoded pixels.
+    """
+    return encode_grayscale_array_lzw_with_differences(image_array)
