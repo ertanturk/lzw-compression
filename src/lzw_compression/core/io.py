@@ -226,51 +226,44 @@ def open_color_bitstreams_with_dimensions(file_path: str) -> tuple[bytes, bytes,
         tuple[bytes, bytes, bytes, int, int]:
             (red_bitstream, green_bitstream, blue_bitstream, height, width)
     """
-    try:
-        with open(file_path, "rb") as file:
-            magic = file.read(4)
-            if magic != _COLOR_MAGIC:
-                raise ValueError("Not a color LZW container")
+    with open(file_path, "rb") as file:
+        magic = file.read(4)
+        if magic != _COLOR_MAGIC:
+            raise ValueError("Not a color LZW container")
 
-            height_bytes = file.read(4)
-            width_bytes = file.read(4)
-            red_len_bytes = file.read(4)
-            green_len_bytes = file.read(4)
-            blue_len_bytes = file.read(4)
+        height_bytes = file.read(4)
+        width_bytes = file.read(4)
+        red_len_bytes = file.read(4)
+        green_len_bytes = file.read(4)
+        blue_len_bytes = file.read(4)
 
-            if (
-                len(height_bytes) != 4  # noqa: PLR2004
-                or len(width_bytes) != 4  # noqa: PLR2004
-                or len(red_len_bytes) != 4  # noqa: PLR2004
-                or len(green_len_bytes) != 4  # noqa: PLR2004
-                or len(blue_len_bytes) != 4  # noqa: PLR2004
-            ):
-                raise ValueError("Corrupted color LZW header")
+        if (
+            len(height_bytes) != 4  # noqa: PLR2004
+            or len(width_bytes) != 4  # noqa: PLR2004
+            or len(red_len_bytes) != 4  # noqa: PLR2004
+            or len(green_len_bytes) != 4  # noqa: PLR2004
+            or len(blue_len_bytes) != 4  # noqa: PLR2004
+        ):
+            raise ValueError("Corrupted color LZW header")
 
-            height = int.from_bytes(height_bytes, byteorder="little")
-            width = int.from_bytes(width_bytes, byteorder="little")
-            red_len = int.from_bytes(red_len_bytes, byteorder="little")
-            green_len = int.from_bytes(green_len_bytes, byteorder="little")
-            blue_len = int.from_bytes(blue_len_bytes, byteorder="little")
+        height = int.from_bytes(height_bytes, byteorder="little")
+        width = int.from_bytes(width_bytes, byteorder="little")
+        red_len = int.from_bytes(red_len_bytes, byteorder="little")
+        green_len = int.from_bytes(green_len_bytes, byteorder="little")
+        blue_len = int.from_bytes(blue_len_bytes, byteorder="little")
 
-            red_bitstream = file.read(red_len)
-            green_bitstream = file.read(green_len)
-            blue_bitstream = file.read(blue_len)
+        red_bitstream = file.read(red_len)
+        green_bitstream = file.read(green_len)
+        blue_bitstream = file.read(blue_len)
 
-            if (
-                len(red_bitstream) != red_len
-                or len(green_bitstream) != green_len
-                or len(blue_bitstream) != blue_len
-            ):
-                raise ValueError("Corrupted color LZW payload")
+        if (
+            len(red_bitstream) != red_len
+            or len(green_bitstream) != green_len
+            or len(blue_bitstream) != blue_len
+        ):
+            raise ValueError("Corrupted color LZW payload")
 
-            return red_bitstream, green_bitstream, blue_bitstream, height, width
-    except FileNotFoundError:
-        print(f"File {file_path} not found.")
-        sys.exit(1)
-    except Exception as e:
-        print(f"An error occurred while opening the file '{file_path}': {e}")
-        sys.exit(1)
+        return red_bitstream, green_bitstream, blue_bitstream, height, width
 
 
 def save_image_file(image_array: np.ndarray, output_file_path: str, format: str = "PNG") -> None:
