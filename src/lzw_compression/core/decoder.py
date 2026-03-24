@@ -85,7 +85,8 @@ def codes_to_text(codes: list[int]) -> str:
 
 
 def codes_to_image_grayscale(
-	codes: list[int], image_shape: tuple[int, int],
+	codes: list[int],
+	image_shape: tuple[int, int],
 ) -> np.ndarray:
 	"""Decodes a list of LZW codes back to a grayscale image represented as a NumPy array.
 
@@ -168,7 +169,8 @@ def image_file_decoder_grayscale(file_path: str) -> np.ndarray:
 
 
 def codes_to_image_grayscale_differences(
-	codes: list[int], image_shape: tuple[int, int],
+	codes: list[int],
+	image_shape: tuple[int, int],
 ) -> np.ndarray:
 	"""Decodes LZW codes back to original image using 2D delta decoding.
 

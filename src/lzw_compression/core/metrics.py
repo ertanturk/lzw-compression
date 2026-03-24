@@ -26,7 +26,8 @@ def calculate_file_size(file_path: str) -> int:
 
 
 def calculate_compression_ratio(
-	original_file_path: str, compressed_file_path: str,
+	original_file_path: str,
+	compressed_file_path: str,
 ) -> float:
 	"""Calculate the compression ratio (CR).
 
@@ -54,7 +55,8 @@ def calculate_compression_ratio(
 
 
 def calculate_compression_factor(
-	original_file_path: str, compressed_file_path: str,
+	original_file_path: str,
+	compressed_file_path: str,
 ) -> float:
 	"""Calculate the compression factor (CF).
 
@@ -111,7 +113,8 @@ def calculate_space_saving(original_file_path: str, compressed_file_path: str) -
 
 
 def calculate_size_difference(
-	original_file_path: str, compressed_file_path: str,
+	original_file_path: str,
+	compressed_file_path: str,
 ) -> int:
 	"""Calculate byte difference between original and compressed files.
 
@@ -166,7 +169,9 @@ def calculate_entropy(pixel_values: np.ndarray) -> float:
 
 
 def calculate_total_code_bits(
-	codes: list[int], initial_width: int = 9, max_width: int = 12,
+	codes: list[int],
+	initial_width: int = 9,
+	max_width: int = 12,
 ) -> int:
 	"""Calculate total payload bits used by variable-width LZW codes.
 
@@ -236,7 +241,8 @@ def calculate_average_code_length(
 
 
 def calculate_text_compression_metrics(
-	original_file_path: str, compressed_file_path: str,
+	original_file_path: str,
+	compressed_file_path: str,
 ) -> dict[str, Any]:
 	"""Calculate compression metrics for text files.
 
@@ -253,16 +259,20 @@ def calculate_text_compression_metrics(
 		compressed_size = calculate_file_size(compressed_file_path)
 
 		compression_ratio = calculate_compression_ratio(
-			original_file_path, compressed_file_path,
+			original_file_path,
+			compressed_file_path,
 		)
 		compression_factor = calculate_compression_factor(
-			original_file_path, compressed_file_path,
+			original_file_path,
+			compressed_file_path,
 		)
 		space_saving = calculate_space_saving(
-			original_file_path, compressed_file_path,
+			original_file_path,
+			compressed_file_path,
 		)
 		size_difference = calculate_size_difference(
-			original_file_path, compressed_file_path,
+			original_file_path,
+			compressed_file_path,
 		)
 
 		return {
@@ -307,16 +317,20 @@ def calculate_image_compression_metrics(
 		entropy = calculate_entropy(pixel_values)
 		avg_code_length = calculate_average_code_length(bitstream, codes)
 		compression_ratio = calculate_compression_ratio(
-			original_file_path, compressed_file_path,
+			original_file_path,
+			compressed_file_path,
 		)
 		compression_factor = calculate_compression_factor(
-			original_file_path, compressed_file_path,
+			original_file_path,
+			compressed_file_path,
 		)
 		space_saving = calculate_space_saving(
-			original_file_path, compressed_file_path,
+			original_file_path,
+			compressed_file_path,
 		)
 		size_difference = calculate_size_difference(
-			original_file_path, compressed_file_path,
+			original_file_path,
+			compressed_file_path,
 		)
 
 		return {

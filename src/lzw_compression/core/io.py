@@ -142,7 +142,10 @@ def open_color_image_file(file_path: str) -> tuple[np.ndarray, np.ndarray, np.nd
 
 
 def write_bitstream_with_dimensions(
-	bitstream: bytes, output_file_path: str, height: int, width: int,
+	bitstream: bytes,
+	output_file_path: str,
+	height: int,
+	width: int,
 ) -> None:
 	"""Write a bitstream with embedded image dimensions to a file.
 
@@ -283,7 +286,9 @@ def open_color_bitstreams_with_dimensions(
 
 
 def save_image_file(
-	image_array: np.ndarray, output_file_path: str, format: str = "PNG",
+	image_array: np.ndarray,
+	output_file_path: str,
+	format: str = "PNG",
 ) -> None:
 	"""Save a NumPy array as an image file.
 

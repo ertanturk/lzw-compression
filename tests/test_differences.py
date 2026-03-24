@@ -36,7 +36,7 @@ def _assert_delta_roundtrip(image: np.ndarray, tag: str) -> None:
 
 
 @test
-def test_compute_left_top_differences_expected_values():
+def test_compute_left_top_differences_expected_values() -> None:
 	"""Verify exact difference transform semantics on a small fixed matrix."""
 	arr = np.array(
 		[
@@ -60,7 +60,7 @@ def test_compute_left_top_differences_expected_values():
 
 
 @test
-def test_codes_to_image_grayscale_differences_direct_cycle():
+def test_codes_to_image_grayscale_differences_direct_cycle() -> None:
 	"""Direct encode/decode cycle without filesystem helpers."""
 	image = np.array(
 		[
@@ -76,7 +76,7 @@ def test_codes_to_image_grayscale_differences_direct_cycle():
 
 
 @test
-def test_difference_lzw_file_roundtrip_gradient():
+def test_difference_lzw_file_roundtrip_gradient() -> None:
 	"""Gradient image round-trip via .lzw file with dimensions."""
 	image = np.array(
 		[
@@ -91,7 +91,7 @@ def test_difference_lzw_file_roundtrip_gradient():
 
 
 @test
-def test_difference_lzw_file_roundtrip_mixed_pattern():
+def test_difference_lzw_file_roundtrip_mixed_pattern() -> None:
 	"""Mixed local structure also reconstructs exactly."""
 	image = np.array(
 		[

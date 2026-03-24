@@ -31,7 +31,7 @@ def _write_text(path: str, content: str) -> None:
 
 
 @test
-def test_open_text_file_reads_known_samples():
+def test_open_text_file_reads_known_samples() -> None:
 	"""Text loader reads expected sample contents."""
 	csv_path = _sample("test_io_text_a.txt")
 	txt_path = _sample("test_io_text_b.txt")
@@ -43,7 +43,7 @@ def test_open_text_file_reads_known_samples():
 
 
 @test
-def test_open_text_file_missing_raises_system_exit():
+def test_open_text_file_missing_raises_system_exit() -> None:
 	"""Missing file should terminate with exit code 1."""
 	try:
 		open_text_file(_sample("does_not_exist.txt"))
@@ -52,7 +52,7 @@ def test_open_text_file_missing_raises_system_exit():
 
 
 @test
-def test_bitstream_raw_write_and_open_roundtrip():
+def test_bitstream_raw_write_and_open_roundtrip() -> None:
 	"""Raw bitstream write/open path preserves bytes exactly."""
 	payload = b"\x07\x10\x20\x30\x40"
 	out = _sample("test_io_raw_bitstream.lzw")
@@ -61,7 +61,7 @@ def test_bitstream_raw_write_and_open_roundtrip():
 
 
 @test
-def test_bitstream_with_dimensions_roundtrip_header_and_payload():
+def test_bitstream_with_dimensions_roundtrip_header_and_payload() -> None:
 	"""Dimensioned bitstream helper should preserve payload and dimensions."""
 	payload = b"\x01\x02\x03\x04"
 	out = _sample("test_io_dims.lzw")
@@ -74,7 +74,7 @@ def test_bitstream_with_dimensions_roundtrip_header_and_payload():
 
 
 @test
-def test_open_image_file_returns_numpy_array():
+def test_open_image_file_returns_numpy_array() -> None:
 	"""Saved grayscale image can be loaded back as array with same pixels."""
 	image = np.array([[0, 127], [200, 255]], dtype=np.uint8)
 	path = _sample("test_io_gray.png")
@@ -86,7 +86,7 @@ def test_open_image_file_returns_numpy_array():
 
 
 @test
-def test_open_color_image_file_splits_rgb_channels():
+def test_open_color_image_file_splits_rgb_channels() -> None:
 	"""Color loader should return independent R/G/B channel arrays."""
 	rgb = np.array(
 		[[[10, 20, 30], [40, 50, 60]], [[70, 80, 90], [100, 110, 120]]],
@@ -102,7 +102,7 @@ def test_open_color_image_file_splits_rgb_channels():
 
 
 @test
-def test_open_color_image_file_grayscale_returns_triplicate_channels():
+def test_open_color_image_file_grayscale_returns_triplicate_channels() -> None:
 	"""Grayscale input should map to identical R/G/B outputs by design."""
 	gray = np.array([[1, 2, 3], [4, 5, 6]], dtype=np.uint8)
 	path = _sample("test_io_gray_as_color.png")
@@ -115,7 +115,7 @@ def test_open_color_image_file_grayscale_returns_triplicate_channels():
 
 
 @test
-def test_color_bitstream_container_roundtrip():
+def test_color_bitstream_container_roundtrip() -> None:
 	"""Color container should preserve three channel payloads and dimensions."""
 	out = _sample("test_io_color_container.lzw")
 	red = b"\x01\x11\x21"

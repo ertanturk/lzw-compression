@@ -4,7 +4,9 @@ _MAX_PADDING_BITS = 7
 
 
 def convert_to_bitstream(
-	codes: list[int], initial_width: int = 9, max_width: int = 12,
+	codes: list[int],
+	initial_width: int = 9,
+	max_width: int = 12,
 ) -> bytes:
 	"""Convert a list of variable-width codes into a bitstream.
 
@@ -55,7 +57,9 @@ def convert_to_bitstream(
 
 
 def convert_bytes_to_codes(
-	bitstream: bytes, initial_width: int = 9, max_width: int = 12,
+	bitstream: bytes,
+	initial_width: int = 9,
+	max_width: int = 12,
 ) -> list[int]:
 	"""Convert a bitstream back into a list of variable-width codes.
 
