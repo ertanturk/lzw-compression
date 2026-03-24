@@ -36,29 +36,26 @@ lzw-gui = "lzw_compression.ui.app:main"
 # ----------------------
 
 [tool.ruff]
-line-length = 100
+line-length = 88
+indent-width = 8
 target-version = "py312"
-fix = true
+
+[tool.ruff.format]
+indent-style = "tab"
+quote-style = "double"
 
 [tool.ruff.lint]
-select = [
-    "E",    # pycodestyle errors
-    "W",    # pycodestyle warnings
-    "F",    # pyflakes
-    "I",    # import sorting
-    "UP",   # pyupgrade
-    "B",    # bugbear
-    "C4",   # comprehensions
-    "SIM",  # simplifications
-    "RUF",  # Ruff-specific rules
-    "PL",   # pylint subset
-    "ARG"   # unused arguments
-]
-
-ignore = []
+select = ["F", "I", "B", "UP", "C901", "SIM", "PL", "RUF"]
+ignore = ["W191"]
 fixable = ["ALL"]
 unfixable = []
 
-[tool.ruff.format]
-quote-style = "double"
-indent-style = "space"
+[tool.ruff.lint.mccabe]
+max-complexity = 10
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+warn_unused_ignores = true
+warn_return_any = true
+exclude = ["build/", "\\.venv/"]
